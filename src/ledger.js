@@ -74,6 +74,9 @@ export class Ledger {
     return order;
   }
 
+  /**
+   * Fill valid orders based on best bid and ask prices 
+   */
   fillOrders(bidPrice, askPrice) {
     // Fill Bids
     this.orders.bid.filter((order) => order.price > bidPrice)
@@ -92,6 +95,7 @@ export class Ledger {
     this.balance -= total;
 
     this.deleteOrder(order, true);
+    this.orderHistory.push(order);
     this.logFill('BID', order.price, order.quantity, order.quantity, -total);
   }
 
@@ -102,13 +106,17 @@ export class Ledger {
     this.spareBalance += total;
 
     this.deleteOrder(order, true);
+    this.orderHistory.push(order);
     this.logFill('ASK', order.price, order.quantity, order.quantity, total);
   }
 
+  /**
+   * Return a string showing current balances and open orders
+   */
   displayAssetBalances() {
     return `${this.sourceTicker}: ${this.balance} (${this.spareBalance})\n` +
       `${this.destTicker}: ${this.quantity} (${this.spareQuantity})\n` +
-      `Bids (${this.orders.bid.length}) | Asks (${this.orders.ask.length})`;
+      `Bids (${this.orders.bid.length}) | Asks (${this.orders.ask.length}) | Filled (${this.orderHistory.length})`;
   }
 
   logFill(side, price, quantity, dquantity, dbalance) {
