@@ -1,5 +1,3 @@
-import { sides } from "./enums";
-
 export class Ledger {
   constructor(sourceAmount, sourceTicker, destAmount, destTicker) {
     this.balance = sourceAmount;
@@ -8,26 +6,12 @@ export class Ledger {
     this.spareQuantity = destAmount;
     this.sourceTicker = sourceTicker;
     this.destTicker = destTicker;
+    this.orderHistory = [];
 
     this.orders = {
       bid: [],
       ask: []
     };
-
-    // this.sides = {
-    //   bid: {
-    //     balance: sourceAmount,
-    //     availableBalance: sourceAmount,
-    //     orders: [],
-    //     ticker: sourceTicker
-    //   },
-    //   ask: {
-    //     balance: destAmount,
-    //     availableBalance: destAmount,
-    //     orders: [],
-    //     ticker: destTicker
-    //   }
-    // };
   }
 
   /**
@@ -35,7 +19,7 @@ export class Ledger {
    * @param {*} order order object
    * @param {*} side the side of the order
    */
-  deleteOrder(order) {
+  deleteOrder(order, keepBalanceReduction = false) {
     const orders = order.quantity > 0
       ? this.orders.bid
       : this.orders.ask;
@@ -46,11 +30,13 @@ export class Ledger {
 
     const deletedOrder = orders.splice(idx, 1);
 
-    if (order.quantity >= 0) {
-      const total = order.price * order.amount;
-      this.spareBalance += total;
-    } else {
-      this.spareQuantity -= order.quantity;
+    if (!keepBalanceReduction) {
+      if (order.quantity >= 0) {
+        const total = order.price * order.amount;
+        this.spareBalance += total;
+      } else {
+        this.spareQuantity -= order.quantity;
+      }
     }
 
     return deletedOrder;
@@ -73,6 +59,7 @@ export class Ledger {
       
       this.spareQuantity += quantity
       this.orders.ask.push(order);
+      this.logOrder('ASK', price, quantity);
 
     } else {
       // Buy order
@@ -81,14 +68,61 @@ export class Ledger {
 
       this.spareBalance -= total;
       this.orders.bid.push(order);
+      this.logOrder('BID', price, quantity);
     }
 
     return order;
   }
 
-  getSideLedger(side) {
-    return side === sides.BID
-      ? this.sides.bid
-      : this.sides.ask;
+  fillOrders(bidPrice, askPrice) {
+    // Fill Bids
+    this.orders.bid.filter((order) => order.price > bidPrice)
+      .map(o => this.fillBidOrder(o));
+
+    // Fill Asks
+    this.orders.ask.filter((order) => order.price < askPrice)
+      .map(o => this.fillAskOrder(o));
+
   }
+
+  fillBidOrder(order) {
+    const total = order.quantity * order.price;
+    this.quantity += order.quantity;
+    this.spareQuantity += order.quantity;
+    this.balance -= total;
+
+    this.deleteOrder(order, true);
+    this.logFill('BID', order.price, order.quantity, order.quantity, -total);
+  }
+
+  fillAskOrder(order) {
+    const total = -order.quantity * order.price;
+    this.quantity -= order.quantity;
+    this.balance += total;
+    this.spareBalance += total;
+
+    this.deleteOrder(order, true);
+    this.logFill('ASK', order.price, order.quantity, order.quantity, total);
+  }
+
+  displayAssetBalances() {
+    return `${this.sourceTicker}: ${this.balance} (${this.spareBalance})\n` +
+      `${this.destTicker}: ${this.quantity} (${this.spareQuantity})\n` +
+      `Bids (${this.orders.bid.length}) | Asks (${this.orders.ask.length})`;
+  }
+
+  logFill(side, price, quantity, dquantity, dbalance) {
+    console.log(`FILLED ${side} @ ${price} ${quantity} (${this.sourceTicker} ${this.formatNumber(dbalance)} ${this.destTicker} ${this.formatNumber(dquantity)})`)
+  }
+
+  logOrder(side, price, quantity) {
+    console.log(`PLACED ${side} @ ${price} ${quantity}`);
+  }
+
+  formatNumber(number) {
+    return number > 0
+     ? "+" + number
+     : number;
+  }
+
 }

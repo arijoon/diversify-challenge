@@ -24,7 +24,7 @@ export class MarketApi {
 
   get(url) {
     return new Promise((resolve, reject) => {
-      https.get(this.url, (res) => {
+      https.get(url, (res) => {
         let data = '';
         res.on('data', (chunk) => data += chunk);
         res.on('end', () => resolve(JSON.parse(data)));
